@@ -1,0 +1,102 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: /users/{userId}
+    // Fields:
+    //   - uid: string (required)
+    //   - email: string (required, email format)
+    //   - displayName: string
+    //   - photoURL: string
+    //   - createdAt: string (date-time format)
+    //
+    // Collection: /users/{userId}/plants/{plantId}
+    // Fields:
+    //   - userId: string (required)
+    //   - name: string (required)
+    //   - scientificName: string
+    //   - description: string
+    //   - careInstructions: string
+    //   - imageUrl: string
+    //   - identifiedAt: string (date-time format)
+    //
+    // Collection: /users/{userId}/chats/{chatId}
+    // Fields:
+    //   - userId: string (required)
+    //   - role: string (required, enum: ["user", "model"])
+    //   - content: string (required)
+    //   - timestamp: string (required, date-time format)
+    //
+    // ===============================================================
+
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidDateString(dateStr) {
+      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
+    }
+
+    // Domain Validators
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email']) &&
+             data.uid == request.auth.uid &&
+             isValidEmail(data.email) &&
+             (data.get('displayName', '') is string) &&
+             (data.get('photoURL', '') is string);
+    }
+
+    function isValidPlant(data, userId) {
+      return data.keys().hasAll(['userId', 'name']) &&
+             data.userId == userId &&
+             data.userId == request.auth.uid &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
+             (data.get('scientificName', '') is string) &&
+             (data.get('description', '') is string) &&
+             (data.get('careInstructions', '') is string) &&
+             (data.get('imageUrl', '') is string);
+    }
+
+    function isValidChatMessage(data, userId) {
+      return data.keys().hasAll(['userId', 'role', 'content', 'timestamp']) &&
+             data.userId == userId &&
+             data.userId == request.auth.uid &&
+             data.role in ['user', 'model'] &&
+             data.content is string && data.content.size() > 0 && data.content.size() < 5000 &&
+             isValidDateString(data.timestamp);
+    }
+
+    // Rules
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if isOwner(userId) && isValidUser(request.resource.data);
+
+      match /plants/{plantId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidPlant(request.resource.data, userId);
+        allow update: if isOwner(userId) && isValidPlant(request.resource.data, userId);
+        allow delete: if isOwner(userId);
+      }
+
+      match /chats/{chatId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidChatMessage(request.resource.data, userId);
+        allow update: if isOwner(userId) && isValidChatMessage(request.resource.data, userId);
+        allow delete: if isOwner(userId);
+      }
+    }
+  }
+}
