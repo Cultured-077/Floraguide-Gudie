@@ -366,8 +366,14 @@ export default function App() {
                           referrerPolicy="no-referrer"
                         />
                         <button 
-                          onClick={() => deletePlant(plant.id)}
-                          className="absolute top-3 right-3 p-2 bg-white/80 backdrop-blur-sm rounded-full text-red-500 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (window.confirm('Are you sure you want to remove this plant from your collection?')) {
+                              deletePlant(plant.id);
+                            }
+                          }}
+                          className="absolute top-3 right-3 p-2 bg-white/90 backdrop-blur-sm rounded-full text-red-500 shadow-sm hover:bg-red-50 transition-colors z-10"
+                          title="Remove from collection"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -452,7 +458,21 @@ export default function App() {
                         <h3 className="text-3xl font-bold text-emerald-900 leading-tight">{identificationResult.name}</h3>
                         <p className="text-lg italic text-emerald-600">{identificationResult.scientificName}</p>
                       </div>
-                      {identificationResult.id ? null : (
+                      {identificationResult.id ? (
+                        <button 
+                          onClick={() => {
+                            if (window.confirm('Are you sure you want to remove this plant from your collection?')) {
+                              deletePlant(identificationResult.id!);
+                              setIdentificationResult(null);
+                              setActiveTab('collection');
+                            }
+                          }}
+                          className="bg-red-50 text-red-600 px-6 py-3 rounded-2xl font-bold hover:bg-red-100 transition-all border border-red-100 flex items-center gap-2"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                          Remove from Collection
+                        </button>
+                      ) : (
                         <button 
                           onClick={savePlant}
                           className="bg-emerald-600 text-white px-6 py-3 rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100"
